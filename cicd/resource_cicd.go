@@ -44,14 +44,14 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
     path := d.Get("path").(string)
     
     if path != "" {
-        fmt.Println("Changing directory to:", path)
+        fmt.Printf("Changing directory to: %s\n", path)
         err := os.Chdir(path)
         if err != nil {
-            return diag.FromErr(fmt.Errorf("failed to change directory to '%s': %v", path, err))
+            fmt.Printf("Failed to change directory: %v\n", err)
+            return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
         }
-    } else {
-        return diag.FromErr(fmt.Errorf("path has not been specified. Please provide a valid directory."))
     }
+    
     
     if step_1 != "" {
         cmd := exec.Command("sh", "-c", step_1)
