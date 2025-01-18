@@ -45,20 +45,14 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
     
     if path != "" {
         fmt.Println("Changing directory to:", path)
-        // Attempt to change directory
         err := os.Chdir(path)
         if err != nil {
-            return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
+            return diag.FromErr(fmt.Errorf("failed to change directory to '%s': %v", path, err))
         }
     } else {
-        // If path is not specified, output a message
         fmt.Println("Path has not been specified.")
-        // Here, you can return an error if you want to stop execution when path is empty
-        err := exec.Command("sh", "-c", "echo 'Path has not been specified.'").Run()
-        if err != nil {
-            return diag.FromErr(fmt.Errorf("failed to execute command for empty path: %v", err))
-        }
     }
+    
 
      if step_1 != "" {
         command := strings.ToLower(step_1) //split and check if build is succesful, check for dependencies and install ?

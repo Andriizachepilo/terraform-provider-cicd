@@ -12,7 +12,6 @@ provider "cicd" {
 }
 
 resource "cicd_example" "creating" {
-  step_1 = "npm test" //check if mvn is installed, if it's not ask if u want to and if yes automatically install it 
-  path = "/Users/andriizachepilo/CopylotProject/terraform-provider-cicd/java" //error like it's not found or smth else (looking for json or pom.xml)
- 
+  step_1 = "npm test"
+  path   = ""
 }
