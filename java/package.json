@@ -1,0 +1,13 @@
+{
+  "name": "node-app",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "jest",
+    "build": "echo \"No build step for this app\""
+  },
+  "devDependencies": {
+    "jest": "^27.4.3"
+  }
+}
+

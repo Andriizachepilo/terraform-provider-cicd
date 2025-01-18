@@ -11,23 +11,8 @@ provider "cicd" {
   # Configuration options
 }
 
-resource "cicd_example" "example" {
-  programming_language     = "java"
-  build_tool               = "maven"
-  docker_tag               = "myapp:123"
-  registry_url             = "myregistry.com"
-  registry_credentials     = "MY_REGISTRY_PASSWORD"
-
-  skip_build               = false
-  skip_test                = false
-  skip_build_docker_image  = false
-  skip_push_docker_image   = false
-
-  custom_build_command     = null
-  custom_test_command      = null
-
-  environment_variables = {
-    KEY1 = "value1"
-    KEY2 = "value2"
-  }
+resource "cicd_example" "creating" {
+  step_1 = "npm test" //check if mvn is installed, if it's not ask if u want to and if yes automatically install it 
+  path = "/Users/andriizachepilo/CopylotProject/terraform-provider-cicd/java" //error like it's not found or smth else (looking for json or pom.xml)
+ 
 }
