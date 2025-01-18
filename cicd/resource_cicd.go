@@ -50,22 +50,31 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
             return diag.FromErr(fmt.Errorf("failed to change directory to '%s': %v", path, err))
         }
     } else {
-        fmt.Println("Path has not been specified.")
+        return diag.FromErr(fmt.Errorf("path has not been specified. Please provide a valid directory."))
     }
     
-
-     if step_1 != "" {
-        command := strings.ToLower(step_1) //split and check if build is succesful, check for dependencies and install ?
-        err := exec.Command("sh", "-c", command).Run()
+    if step_1 != "" {
+        fmt.Println("Executing command:", step_1)
+        cmd := exec.Command("sh", "-c", step_1)
+        output, err := cmd.CombinedOutput() // Capture both stdout and stderr
         if err != nil {
-            return diag.FromErr(err)
+            fmt.Printf("Command failed with error: %v\nOutput: %s\n", err, string(output))
+            return diag.FromErr(fmt.Errorf("failed to execute command '%s': %v", step_1, err))
         }
-     } else {
-        err := exec.Command("sh", "-c", fmt.Sprintf("%s", "There are not steps specified")).Run()
-        if err != nil {
-            return diag.FromErr(err)
-        }
-     }
+        fmt.Println("Command executed successfully. Output:", string(output))
+    }
+    //  if step_1 != "" {
+    //     command := strings.ToLower(step_1) //split and check if build is succesful, check for dependencies and install ?
+    //     err := exec.Command("sh", "-c", command).Run()
+    //     if err != nil {
+    //         return diag.FromErr(err)
+    //     }
+    //  } else {
+    //     err := exec.Command("sh", "-c", fmt.Sprintf("%s", "There are not steps specified")).Run()
+    //     if err != nil {
+    //         return diag.FromErr(err)
+    //     }
+    //  }
 
     if step_2 != "" {
         command := strings.ToLower(step_2)

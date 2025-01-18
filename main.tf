@@ -13,5 +13,5 @@ provider "cicd" {
 
 resource "cicd_example" "creating" {
   step_1 = "npm test"
-  path   = ""
+  path   = "/Users/andriizachepilo/CopylotProject/terraform-provider-cicd/java"
 }
