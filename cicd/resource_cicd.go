@@ -54,7 +54,6 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
     }
     
     if step_1 != "" {
-        fmt.Println("Executing command:", step_1)
         cmd := exec.Command("sh", "-c", step_1)
         output, err := cmd.CombinedOutput() // Capture both stdout and stderr
         if err != nil {
