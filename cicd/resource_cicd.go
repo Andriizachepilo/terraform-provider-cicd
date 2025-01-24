@@ -1,14 +1,15 @@
 package cicd
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"strings"
+    "context"
+    "fmt"
+    "os"
+    "os/exec"
+    "strings"
+    "time"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+    "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func ResourceCICD() *schema.Resource {
@@ -17,6 +18,7 @@ func ResourceCICD() *schema.Resource {
         ReadContext:   resourceCICDRead,
         UpdateContext: resourceCICDUpdate,
         DeleteContext: resourceCICDDelete,
+        CustomizeDiff: customizeDiff, // Add CustomizeDiff function
 
         Schema: map[string]*schema.Schema{
             "step_1": {
@@ -25,24 +27,46 @@ func ResourceCICD() *schema.Resource {
             },
             "step_2": {
                 Type:     schema.TypeString,
-                Required: false,
                 Optional: true,
             },
             "path": {
                 Type:     schema.TypeString,
                 Required: true,
             },
+            "timestamp": {
+                Type:     schema.TypeString,
+                Computed: true,
+            },
         },
     }
+}
+
+func customizeDiff(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+    // Set a new timestamp to force the resource to be updated
+    d.SetNewComputed("timestamp")
+    return nil
+}
+
+func executeCommand(command string) error {
+    fmt.Printf("Executing command: %s\n", command)
+    cmd := exec.Command("sh", "-c", command)
+    cmd.Stdout = os.Stdout
+    cmd.Stderr = os.Stderr
+    err := cmd.Run()
+    if err != nil {
+        return fmt.Errorf("command failed with error: %v", err)
+    }
+    return nil
 }
 
 func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
     var diags diag.Diagnostics
 
-    step_1 := d.Get("step_1").(string)
-    step_2 := d.Get("step_2").(string)
+    step1 := d.Get("step_1").(string)
+    step2 := d.Get("step_2").(string)
     path := d.Get("path").(string)
-    
+
+    // Change directory
     if path != "" {
         fmt.Printf("Changing directory to: %s\n", path)
         err := os.Chdir(path)
@@ -51,62 +75,36 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
             return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
         }
     }
-    
-    
-    if step_1 != "" {
-        cmd := exec.Command("sh", "-c", step_1)
-        output, err := cmd.CombinedOutput() // Capture both stdout and stderr
+
+    // Execute step 1
+    if step1 != "" {
+        err := executeCommand(step1)
         if err != nil {
-            fmt.Printf("Command failed with error: %v\nOutput: %s\n", err, string(output))
-            return diag.FromErr(fmt.Errorf("failed to execute command '%s': %v", step_1, err))
+            return diag.FromErr(err)
         }
-        fmt.Println("Command executed successfully. Output:", string(output))
     }
-    //  if step_1 != "" {
-    //     command := strings.ToLower(step_1) //split and check if build is succesful, check for dependencies and install ?
-    //     err := exec.Command("sh", "-c", command).Run()
-    //     if err != nil {
-    //         return diag.FromErr(err)
-    //     }
-    //  } else {
-    //     err := exec.Command("sh", "-c", fmt.Sprintf("%s", "There are not steps specified")).Run()
-    //     if err != nil {
-    //         return diag.FromErr(err)
-    //     }
-    //  }
 
-    if step_2 != "" {
-        command := strings.ToLower(step_2)
-        err := exec.Command("sh", "-c", command).Run()
+    // Execute step 2
+    if step2 != "" {
+        err := executeCommand(step2)
         if err != nil {
             return diag.FromErr(err)
         }
-     } else {
-        err := exec.Command("sh","-c", fmt.Sprintf( "%s", "There are no steps specified")).Run()
-        if err != nil {
-            return diag.FromErr(err)
-        }
-     }
+    }
 
-
-
-    // Set the ID for the resource
-    d.SetId(fmt.Sprintf("%s-%s", strings.ToLower(step_1), strings.ToLower(step_2)))
-
+    // Set the ID and timestamp for the resource
+    d.SetId(fmt.Sprintf("%s-%s", strings.ToLower(step1), strings.ToLower(step2)))
+    d.Set("timestamp", time.Now().Format(time.RFC3339))
 
     return diags
 }
-
-
-
-
 
 func resourceCICDRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
     return nil
 }
 
 func resourceCICDUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-    return nil
+    return resourceCICDCreate(ctx, d, m)
 }
 
 func resourceCICDDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
