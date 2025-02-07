@@ -72,18 +72,23 @@ func customizeDiff(ctx context.Context, d *schema.ResourceDiff, meta interface{}
 	return nil
 }
 
-func executeCommand(command string, workDir string) error {
+func executeCommand(command string, workDir string) (error, string) {
 	if workDir == "" {
-		return fmt.Errorf("working diretory is not specified")
+		return fmt.Errorf("working diretory is not specified"), "."
 	} else {
-		fmt.Printf("Executing command: %s\n", command)
-		cmd := exec.Command("sh", "-c", command)
-		output, err := cmd.CombinedOutput()
-		fmt.Printf("Command output: %s\n", string(output))
+		err := os.Chdir(workDir)
 		if err != nil {
-			return fmt.Errorf("command failed with error: %v\nOutput: %s", err, string(output))
+			return fmt.Errorf("failed to change directory: %v", err),"."
 		}
-		return nil
+		output, err := exec.Command("sh", "-c", command).CombinedOutput()
+		if err != nil {
+			dependenciesErr := ""
+			if strings.Contains(string(output), "command not found") {
+				dependenciesErr = "* Make sure all necessary dependencies are installed *"
+			}
+			return fmt.Errorf("command failed with error: %v\nOutput: %s\n%s", err, string(output), dependenciesErr), "."
+		}
+		return nil, string(output)
 	}
 
 }
@@ -101,65 +106,107 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 	cr_pass := d.Get("container_registry_password").(string)
 	docker_push := d.Get("docker_push").(string)
 
-	// Change to the specified working directory if provided
-	if working_directory != "" {
-		fmt.Printf("Changing directory to: %s\n", working_directory)
-		err := os.Chdir(working_directory)
-		if err != nil {
-			fmt.Printf("Failed to change directory: %v\n", err)
-			return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
+	// feedback := func(dia diag.Diagnostics, processName string, output string) diag.Diagnostics {
+	// 	return append(dia, diag.Diagnostic{
+	// 		Severity: diag.Warning,
+	// 		Summary:  fmt.Sprintf("Step %v completed!\n%v", processName, output),
+	// 	})
+	// }
+	feedback := func(processName, output string) diag.Diagnostics {
+		return diag.Diagnostics{
+			{
+				Severity: diag.Warning,
+				Summary:  fmt.Sprintf("Step %v completed!\n%v", processName, output),
+			},
 		}
 	}
 
-	// Execute the build command if provided
-	if build != "" {
-		err := executeCommand(build, working_directory)
-		if err != nil {
-			return diag.FromErr(err)
-		}
+	// if working_directory != "" {
+	// 	err := os.Chdir(working_directory)
+	// 	if err != nil {
+	// 		return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
+	// 	}
+	// }
+
+	steps := []struct {
+		name string
+		cmd  string
+	}{
+		{"build", build},
+		{"test", test},
+		{"build_and_test", build_and_test},
+		{"docker_build", docker_build},
 	}
 
-	// Execute the test command if provided
-	if test != "" {
-		err := executeCommand(test, working_directory)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-	}
-
-	// Execute the build_and_test command if provided
-	if build_and_test != "" {
-		err := executeCommand(build_and_test, working_directory)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-	}
-
-	// Execute the Docker build command if provided
-	if docker_build != "" {
-		if dockerfile_dir != "" {
-			fmt.Printf("Changing directory to: %s\n", dockerfile_dir)
-			err := os.Chdir(dockerfile_dir)
-			if err != nil {
-				fmt.Printf("Failed to change directory: %v\n", err)
-				return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
-			}
-		}
-		cmd := exec.Command("sh", "-c", fmt.Sprintf("docker build -t %v .", docker_build))
-		output, err := cmd.CombinedOutput()
-		fmt.Printf("Command output: %s\n", string(output))
-		if err != nil {
-			if strings.Contains(string(output), "Is the docker daemon running?") {
-				fmt.Println("Docker is not running!")
-			} else if strings.Contains(string(output), "Not found") {
-				fmt.Println("Docker is not installed, please install Docker and try again")
+	for _, step := range steps {
+		if step.cmd != "" {
+			var err error
+			var output string
+	
+			if dockerfile_dir != "" && step.name == "docker_build" {
+				err, output = executeCommand(step.cmd, dockerfile_dir)
 			} else {
-				return diag.FromErr(fmt.Errorf("docker build failed with error: %v\nOutput: %s", err, string(output)))
+				err, output = executeCommand(step.cmd, working_directory)
 			}
-		} else {
-			fmt.Println("Image was built successfully!")
+	
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			diags = append(diags, feedback(step.name, output)...)
 		}
 	}
+	
+	// if build != "" {
+	// 	err, outp := executeCommand(build, working_directory)
+	// 	if err != nil {
+	// 		return diag.FromErr(err)
+	// 	} else {
+	// 	    return feedback(diags, "build", outp)
+	// 	}
+	// }
+
+	// if test != "" {
+	// 	err, outp := executeCommand(test, working_directory)
+	// 	if err != nil {
+	// 		return diag.FromErr(err)
+	// 	} else {
+	// 		return feedback(diags, "test", outp)
+	// 	}
+	// }
+
+	// // // Execute the build_and_test command if provided
+	// if build_and_test != "" {
+	// 	err, outp := executeCommand(build_and_test, working_directory)
+	// 	if err != nil {
+	// 		return diag.FromErr(err)
+	// 	} else {
+	// 		return feedback(diags, "build_and_test", outp)
+	// 	}
+	// }
+
+	// // Execute the Docker build command if provided
+	// if docker_build != "" {
+	// 	if dockerfile_dir != "" {
+	// 		err := os.Chdir(dockerfile_dir)
+	// 		if err != nil {
+	// 			return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
+	// 		}
+	// 	}
+	// 	output, err := exec.Command("sh", "-c", fmt.Sprintf("docker build -t %v .", docker_build)).CombinedOutput()
+	// 	if err != nil {
+	// 		dockerErr := ""
+	// 		if strings.Contains(string(output), "Is the docker daemon running?") {
+	// 			dockerErr = "Docker is not running, please start docker and try again"
+	// 		} else if strings.Contains(string(output), "Not found") {
+	// 			dockerErr = "Docker is not installed, please install Docker and try again"
+	// 		} else if strings.Contains(string(output), "failed to read dockerfile") {
+	// 			dockerErr = "Dockerfile is not found"
+	// 		}
+	// 		return diag.FromErr(fmt.Errorf("docker build failed with error: %v\n\nOutput: %v\n\n%s", err, dockerErr, string(output)))
+	//     } else {
+	// 		return feedback(diags, "docker_build", string(output))
+	// 	}
+	// }
 
 	// Execute the Docker push command if provided
 	if docker_push != "" {
@@ -174,13 +221,9 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 			}
 		}
 
-		cmd := exec.Command("sh", "-c", fmt.Sprintf("docker push %v", docker_push))
-		output, err := cmd.CombinedOutput()
-		fmt.Printf("Command output: %s\n", string(output))
+		output, err := exec.Command("sh", "-c", fmt.Sprintf("docker push %v", docker_push)).CombinedOutput()
 		if err != nil {
 			return diag.FromErr(fmt.Errorf("docker push failed with error: %v\nOutput: %s", err, string(output)))
-		} else {
-			fmt.Println("Images were pushed successfully")
 		}
 	}
 
