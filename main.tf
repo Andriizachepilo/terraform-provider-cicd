@@ -21,8 +21,12 @@ resource "cicd_example" "creating" {
 // 2) test -  no file found, dependencies are not isntalled, failed test
 
 // 3) docker_build - no dockerfile found, docker is not installed/not running (if dockerfile is in a different dir - add to the code if docker_dir != "" {cd into it})
-// 4) registry - for docker_push we need creds for registry, export secrets, check if dependencies are installed like aws, azure etc, try to log into it, if wrong - 3 more attempts do not start from the beginning 
+// 4) registry - for docker_push we need creds for registry, export secrets, check if dependencies are installed like aws, azure etc, try to log into it, if wrong - 3 more attempts do not start from the beginning/ private and public registry ?
 // 4) docker_push - image does not exist, delete all images after pushing ?
 // autotag ?
 
 //rename feedback function, add error handling and other structure of my project, get rid of dots
+
+
+// authentication probles = docker is not running, token expired, command not found, incorrect url for security 
+// malicious handling, regex for injections for each step ?

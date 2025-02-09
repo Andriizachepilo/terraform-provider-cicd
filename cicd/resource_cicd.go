@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -45,7 +46,7 @@ func ResourceCICD() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			"container_registry_url": {
+			"container_registry": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
@@ -78,7 +79,7 @@ func executeCommand(command string, workDir string) (error, string) {
 	} else {
 		err := os.Chdir(workDir)
 		if err != nil {
-			return fmt.Errorf("failed to change directory: %v", err),"."
+			return fmt.Errorf("failed to change directory: %v", err), "."
 		}
 		output, err := exec.Command("sh", "-c", command).CombinedOutput()
 		if err != nil {
@@ -102,16 +103,10 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 	build_and_test := d.Get("build_and_test").(string)
 	dockerfile_dir := d.Get("dockerfile_directory").(string)
 	docker_build := d.Get("docker_build").(string)
-	container_registry_url := d.Get("container_registry_url").(string)
+	cr_url := d.Get("container_registry").(string)
 	cr_pass := d.Get("container_registry_password").(string)
 	docker_push := d.Get("docker_push").(string)
 
-	// feedback := func(dia diag.Diagnostics, processName string, output string) diag.Diagnostics {
-	// 	return append(dia, diag.Diagnostic{
-	// 		Severity: diag.Warning,
-	// 		Summary:  fmt.Sprintf("Step %v completed!\n%v", processName, output),
-	// 	})
-	// }
 	feedback := func(processName, output string) diag.Diagnostics {
 		return diag.Diagnostics{
 			{
@@ -120,13 +115,6 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 			},
 		}
 	}
-
-	// if working_directory != "" {
-	// 	err := os.Chdir(working_directory)
-	// 	if err != nil {
-	// 		return diag.FromErr(fmt.Errorf("failed to change directory: %v", err))
-	// 	}
-	// }
 
 	steps := []struct {
 		name string
@@ -142,47 +130,19 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 		if step.cmd != "" {
 			var err error
 			var output string
-	
+
 			if dockerfile_dir != "" && step.name == "docker_build" {
 				err, output = executeCommand(step.cmd, dockerfile_dir)
 			} else {
 				err, output = executeCommand(step.cmd, working_directory)
 			}
-	
+
 			if err != nil {
 				return diag.FromErr(err)
 			}
 			diags = append(diags, feedback(step.name, output)...)
 		}
 	}
-	
-	// if build != "" {
-	// 	err, outp := executeCommand(build, working_directory)
-	// 	if err != nil {
-	// 		return diag.FromErr(err)
-	// 	} else {
-	// 	    return feedback(diags, "build", outp)
-	// 	}
-	// }
-
-	// if test != "" {
-	// 	err, outp := executeCommand(test, working_directory)
-	// 	if err != nil {
-	// 		return diag.FromErr(err)
-	// 	} else {
-	// 		return feedback(diags, "test", outp)
-	// 	}
-	// }
-
-	// // // Execute the build_and_test command if provided
-	// if build_and_test != "" {
-	// 	err, outp := executeCommand(build_and_test, working_directory)
-	// 	if err != nil {
-	// 		return diag.FromErr(err)
-	// 	} else {
-	// 		return feedback(diags, "build_and_test", outp)
-	// 	}
-	// }
 
 	// // Execute the Docker build command if provided
 	// if docker_build != "" {
@@ -208,24 +168,56 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 	// 	}
 	// }
 
-	// Execute the Docker push command if provided
-	if docker_push != "" {
-		if strings.Contains(container_registry_url, "amazonaws.com") || strings.Contains(container_registry_url, "azurecr.io") {
-			fmt.Println("DO NUFIN!!!!")
-		} else {
-			cmd := exec.Command("sh", "-c", fmt.Sprintf("docker login --username %v --password %v", container_registry_url, cr_pass))
-			err := cmd.Run()
-			if err != nil {
-				// give them more attempts cos it can be wrong creds
-				return diag.FromErr(err)
+
+	// <aws_account_id>.dkr.ecr.<region>.amazonaws.com
+	// 987654321098.dkr.ecr.eu-west-1.amazonaws.com
+
+    regex := func(reg string) bool {
+     
+     
+
+	}
+
+	if cr_url != "" {
+		var input string
+		if strings.Contains(cr_url, "amazonaws.com") {
+			err := exec.Command("aws", "sts", "get-caller-identity").Run()
+			if err == nil {
+				regionRegex := regexp.MustCompile(`(?:[^\.]*\.){3}([^\.]*)`).FindStringSubmatch(cr_url)[1]
+				input = fmt.Sprintf("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s", regionRegex, cr_url)
+            } else {
+				return diag.FromErr(fmt.Errorf("Unable to locate credentials. You can configure credentials by running 'aws configure' "))
 			}
+		} else if strings.Contains(cr_url, "azurecr.io") {
+			input = fmt.Sprintf("az acr login --name %s", cr_url)
+		} else if strings.Contains(cr_url, "gcr.io") {
+			input = "gcloud auth configure-docker"
 		}
 
-		output, err := exec.Command("sh", "-c", fmt.Sprintf("docker push %v", docker_push)).CombinedOutput()
-		if err != nil {
-			return diag.FromErr(fmt.Errorf("docker push failed with error: %v\nOutput: %s", err, string(output)))
+		err := exec.Command("sh", "-c", input).Run()
+        if err != nil {
+			return diag.FromErr(err)
 		}
 	}
+
+	// Execute the Docker push command if provided
+	// if docker_push != "" {
+	// 	if strings.Contains(cr_url, "amazonaws.com") || strings.Contains(cr_url, "azurecr.io") {
+	// 		fmt.Println("DO NUFIN!!!!")
+	// 	} else {
+	// 		cmd := exec.Command("sh", "-c", fmt.Sprintf("docker login --username %v --password %v", container_registry_url, cr_pass))
+	// 		err := cmd.Run()
+	// 		if err != nil {
+	// 			// give them more attempts cos it can be wrong creds
+	// 			return diag.FromErr(err)
+	// 		}
+	// 	}
+
+	// 	output, err := exec.Command("sh", "-c", fmt.Sprintf("docker push %v", docker_push)).CombinedOutput()
+	// 	if err != nil {
+	// 		return diag.FromErr(fmt.Errorf("docker push failed with error: %v\nOutput: %s", err, string(output)))
+	// 	}
+	// }
 
 	// Set the ID and timestamp for the resource
 	d.SetId(fmt.Sprintf("%s-%s", strings.ToLower(build), strings.ToLower(test)))
