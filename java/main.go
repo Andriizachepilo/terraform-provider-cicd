@@ -2,17 +2,13 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"regexp"
 )
 
 func main() {
-	str := "hello my nme is andry"
-
-if strings.Contains(str,"hello my nme") {
-	fmt.Printf("heheheh")
-} else {
-	fmt.Print("AHAHAHAHAHAHAHAHH")
-}
+	str := "gcr.io/andruha"
+    check := regexp.MustCompile(`^[^/]+/(.+)$`).FindStringSubmatch(str)
+    fmt.Print(check[1])
 }
 
 

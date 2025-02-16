@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
-	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -104,8 +104,8 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 	dockerfile_dir := d.Get("dockerfile_directory").(string)
 	docker_build := d.Get("docker_build").(string)
 	cr_url := d.Get("container_registry").(string)
-	cr_pass := d.Get("container_registry_password").(string)
-	docker_push := d.Get("docker_push").(string)
+	// cr_pass := d.Get("container_registry_password").(string)
+	// docker_push := d.Get("docker_push").(string)
 
 	feedback := func(processName, output string) diag.Diagnostics {
 		return diag.Diagnostics{
@@ -168,36 +168,69 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 	// 	}
 	// }
 
-
 	// <aws_account_id>.dkr.ecr.<region>.amazonaws.com
 	// 987654321098.dkr.ecr.eu-west-1.amazonaws.com
 
-    regex := func(reg string) bool {
-     
-     
-
-	}
+	//     urlFormat := func(aws string, azure string) (bool) {
+	//      if aws != "" {
+	// 		return regexp.MustCompile(`^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com$`).MatchString(aws)
+	//      } else if azure != "" {
+	//         return regexp.MustCompile(`^[a-zA-Z0-9]+\.azurecr\.io$`).MatchString(azure)
+	// 	 }
+	// 	 return false
+	// }
 
 	if cr_url != "" {
 		var input string
 		if strings.Contains(cr_url, "amazonaws.com") {
-			err := exec.Command("aws", "sts", "get-caller-identity").Run()
-			if err == nil {
-				regionRegex := regexp.MustCompile(`(?:[^\.]*\.){3}([^\.]*)`).FindStringSubmatch(cr_url)[1]
-				input = fmt.Sprintf("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s", regionRegex, cr_url)
-            } else {
-				return diag.FromErr(fmt.Errorf("Unable to locate credentials. You can configure credentials by running 'aws configure' "))
+			check_url_format := regexp.MustCompile(`^\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com$`).MatchString(cr_url)
+			if check_url_format {
+				err := exec.Command("aws", "sts", "get-caller-identity").Run()
+				if err == nil {
+					regionRegex := regexp.MustCompile(`(?:[^\.]*\.){3}([^\.]*)`).FindStringSubmatch(cr_url)[1]
+					input = fmt.Sprintf("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s", regionRegex, cr_url)
+				} else {
+					return diag.FromErr(fmt.Errorf("unable to locate credentials. You can configure credentials by running 'aws configure' "))
+				}
+			} else {
+				return diag.FromErr(fmt.Errorf("invalid ECR URL format. Expected format: <aws_account_id>.dkr.ecr.<region>.amazonaws.com"))
 			}
+			//myproject.azurecr.io
 		} else if strings.Contains(cr_url, "azurecr.io") {
-			input = fmt.Sprintf("az acr login --name %s", cr_url)
+			check_url_format := regexp.MustCompile(`^[a-zA-Z0-9]+\.azurecr\.io$`).MatchString(cr_url)
+			if check_url_format {
+				err := exec.Command("az", "account", "show").Run()
+				if err == nil {
+					cr_name := regexp.MustCompile(`[^.]+`).FindStringSubmatch(cr_url)[1]
+					input = fmt.Sprintf("az acr login --name %s", cr_name)
+				} else {
+					return diag.FromErr(fmt.Errorf("unable to locate Azure credentials. Please log in using: az login"))
+				}
+			}
+			//gcr.io/[PROJECT-ID]
 		} else if strings.Contains(cr_url, "gcr.io") {
-			input = "gcloud auth configure-docker"
+			check_url_format := regexp.MustCompile(`^gcr\.io/[a-z0-9-]+$`).MatchString(cr_url)
+			if check_url_format {
+				err := exec.Command("gcloud", "auth", "login").Run()
+				if err == nil {
+					gcrProjectID := regexp.MustCompile(`^[^/]+/(.+)$`).FindStringSubmatch(cr_url)[1]
+					err := exec.Command("gcloud", "config", "set", "project", gcrProjectID)
+					if err == nil {
+						input = "gcloud auth configure-docker"
+					}
+				}
+			}
+			// gcloud auth login
+			// gcloud config set project [PROJECT-ID]
+			// gcloud auth configure-docker
+
 		}
 
 		err := exec.Command("sh", "-c", input).Run()
-        if err != nil {
+		if err != nil {
 			return diag.FromErr(err)
 		}
+
 	}
 
 	// Execute the Docker push command if provided
@@ -224,6 +257,7 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 	d.Set("timestamp", time.Now().Format(time.RFC3339))
 
 	return diags
+
 }
 
 func resourceCICDRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
