@@ -5,6 +5,7 @@ import (
 	"regexp"
 )
 
+
 func main() {
 	str := "gcr.io/andruha"
     check := regexp.MustCompile(`^[^/]+/(.+)$`).FindStringSubmatch(str)

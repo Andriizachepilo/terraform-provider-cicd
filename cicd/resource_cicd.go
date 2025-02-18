@@ -209,7 +209,7 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 			}
 			//gcr.io/[PROJECT-ID]
 		} else if strings.Contains(cr_url, "gcr.io") {
-			check_url_format := regexp.MustCompile(`^gcr\.io/[a-z0-9-]+$`).MatchString(cr_url)
+			check_url_format := regexp.MustCompile(`^gcr\.io/[a-zA-Z0-9-]+$`).MatchString(cr_url)
 			if check_url_format {
 				err := exec.Command("gcloud", "auth", "login").Run()
 				if err == nil {
@@ -223,15 +223,21 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 			// gcloud auth login
 			// gcloud config set project [PROJECT-ID]
 			// gcloud auth configure-docker
+       } else if strings.Contains(cr_url, "docker.io") {
+		 check_url_format := regexp.MustCompile(`^docker\.io/[a-zA-Z0-9-]+$`).MatchString(cr_url)
+		 if check_url_format {
+			  input = "docker login"
+			}
+		 }
+		 err := exec.Command("sh", "-c", input).Run()
+		 if err != nil {
+			 return diag.FromErr(err)
+		 }
+	   }
 
-		}
+		
 
-		err := exec.Command("sh", "-c", input).Run()
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-	}
+	
 
 	// Execute the Docker push command if provided
 	// if docker_push != "" {

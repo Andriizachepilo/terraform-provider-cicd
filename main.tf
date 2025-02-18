@@ -30,3 +30,4 @@ resource "cicd_example" "creating" {
 
 // authentication probles = docker is not running, token expired, command not found, incorrect url for security 
 // malicious handling, regex for injections for each step ?
+// install dependencies 
