@@ -1,9 +1,10 @@
 resource "cicd_example" "creating" {
-  working_directory = "/Users/andriizachepilo/CopylotProject/terraform-provider-cicsd"
-  # build             = "npm run build"
-  # test              = "npm test"
+  working_directory = "/Users/andriizachepilo/CopylotProject/terraform-provider-cicd/java"
+  build             = "npm run build"
+  test              = "npm test"
   # dockerfile_directory = "/Users/andriizachepilo/CopylotProject/terraform-provider-cicd/java"
-  docker_build = "docker build -t kak:bmkkje ." 
+  # docker_build = "docker build -t 18:feb ." 
+  container_registry = "docker.io/andrey342"
   # docker_tag        = "mannually along with build? docker tag name:tag registryURL/repo/name:tag"
   # docker_tag1       = "automatically along with push ?"
   # docker_push = "andrey342/day4:how"
@@ -31,3 +32,5 @@ resource "cicd_example" "creating" {
 // authentication probles = docker is not running, token expired, command not found, incorrect url for security 
 // malicious handling, regex for injections for each step ?
 // install dependencies 
+// token for cr's ?
+// check if acr exists ?

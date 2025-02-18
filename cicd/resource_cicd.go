@@ -229,9 +229,10 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 			  input = "docker login"
 			}
 		 }
-		 err := exec.Command("sh", "-c", input).Run()
+		 output,err := exec.Command("sh", "-c", input).CombinedOutput()
+
 		 if err != nil {
-			 return diag.FromErr(err)
+			 return diag.FromErr(fmt.Errorf("you agagaga yeh %v \nAUTPUT!!!!!!! >>>> %s",err,string(output)))
 		 }
 	   }
 
