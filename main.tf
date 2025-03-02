@@ -4,13 +4,10 @@ resource "cicd_example" "creating" {
   test              = "npm test"
   # dockerfile_directory = "/Users/andriizachepilo/CopylotProject/terraform-provider-cicd/java"
   # docker_build = "docker build -t 18:feb ." 
-  container_registry = "docker.io/andrey342"
+  container_registry_url = "docker.io/andrey342"
   # docker_tag        = "mannually along with build? docker tag name:tag registryURL/repo/name:tag"
   # docker_tag1       = "automatically along with push ?"
   # docker_push = "andrey342/day4:how"
-  # container_registry_url = "acrukwestuniq.azurecr.io"
-  # container_registry_url      = "B"
-  # container_registry_password = "A"
 }
 
 

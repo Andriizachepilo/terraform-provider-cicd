@@ -46,18 +46,13 @@ func ResourceCICD() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			"container_registry": {
+			"container_registry_url": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
 			"dockerfile_directory": {
 				Type:     schema.TypeString,
 				Optional: true,
-			},
-			"container_registry_password": {
-				Type:      schema.TypeString,
-				Optional:  true,
-				Sensitive: true,
 			},
 			"timestamp": {
 				Type:     schema.TypeString,
@@ -103,8 +98,7 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 	build_and_test := d.Get("build_and_test").(string)
 	dockerfile_dir := d.Get("dockerfile_directory").(string)
 	docker_build := d.Get("docker_build").(string)
-	cr_url := d.Get("container_registry").(string)
-	// cr_pass := d.Get("container_registry_password").(string)
+	cr_url := d.Get("container_registry_url").(string)
 	// docker_push := d.Get("docker_push").(string)
 
 	feedback := func(processName, output string) diag.Diagnostics {
@@ -226,7 +220,8 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
        } else if strings.Contains(cr_url, "docker.io") {
 		 check_url_format := regexp.MustCompile(`^docker\.io/[a-zA-Z0-9-]+$`).MatchString(cr_url)
 		 if check_url_format {
-			  input = "docker login"
+			  username := regexp.MustCompile(`^[^/]+/(.+)$`).FindStringSubmatch(cr_url)[1]
+			  input = fmt.Sprintf("echo \"$DOCKER_ACCESS_TOKEN\" | docker login -u %s --password-stdin", username) // with username and token or password
 			}
 		 }
 		 output,err := exec.Command("sh", "-c", input).CombinedOutput()
