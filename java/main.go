@@ -2,19 +2,15 @@ package main
 
 import (
 	"fmt"
-	"regexp"
+	"os"
 )
 
 
 func main() {
-	str := "gcr.io/andruha"
-    check := regexp.MustCompile(`^[^/]+/(.+)$`).FindStringSubmatch(str)
-    fmt.Print(check[1])
+if os.Getenv("OLA") != "" {
+	env := os.Getenv("OLA")
+	fmt.Print(env)
+}
 }
 
 
-// func checking (anuthing string) string {
-// 	for _, v := range anuthing {
-// 		if v
-// 	}
-// }

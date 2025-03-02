@@ -219,8 +219,11 @@ func resourceCICDCreate(ctx context.Context, d *schema.ResourceData, m interface
 			// gcloud auth configure-docker
        } else if strings.Contains(cr_url, "docker.io") {
 		 check_url_format := regexp.MustCompile(`^docker\.io/[a-zA-Z0-9-]+$`).MatchString(cr_url)
-		 if check_url_format {
+		 if check_url_format { //check if docker login is not failed - skip this step
 			  username := regexp.MustCompile(`^[^/]+/(.+)$`).FindStringSubmatch(cr_url)[1]
+			  if os.Getenv("DOCKER_ACCESS_TOKEN") == "" {
+                return diag.FromErr(fmt.Errorf("docker access token is not set. Please set it using 'export DOCKER_ACCESS_TOKEN=<your_token>'"))
+            }
 			  input = fmt.Sprintf("echo \"$DOCKER_ACCESS_TOKEN\" | docker login -u %s --password-stdin", username) // with username and token or password
 			}
 		 }
